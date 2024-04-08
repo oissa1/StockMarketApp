@@ -1,7 +1,10 @@
 package com.plcoding.stockmarketapp.data.repository
 
+import com.plcoding.stockmarketapp.data.csv.CSVParser
+import com.plcoding.stockmarketapp.data.csv.CompanyListingsParser
 import com.plcoding.stockmarketapp.data.local.StockDatabase
 import com.plcoding.stockmarketapp.data.mapper.toCompanyListing
+import com.plcoding.stockmarketapp.data.mapper.toCompanyListingEntity
 import com.plcoding.stockmarketapp.data.remote.StockApi
 import com.plcoding.stockmarketapp.domain.model.CompanyListing
 import com.plcoding.stockmarketapp.domain.repository.StockRepository
@@ -16,14 +19,14 @@ import javax.inject.Singleton
 @Singleton
 class StockRepositoryImpl @Inject constructor(
     private val api: StockApi,
-    db: StockDatabase
+    db: StockDatabase,
+    val companyListingsParser: CSVParser<CompanyListing>
 ) : StockRepository {
 
     private val dao = db.dao
 
     override suspend fun getCompanyListings(
-        fetchFromRemote: Boolean,
-        query: String
+        fetchFromRemote: Boolean, query: String
     ): Flow<Resource<List<CompanyListing>>> = flow {
         emit(Resource.Loading(isLoading = true))
         val localListings = dao.searchCompanyListings(query)
@@ -38,13 +41,25 @@ class StockRepositoryImpl @Inject constructor(
         }
         val remoteListings = try {
             val response = api.getListings()
-
+            companyListingsParser.parse(response.byteStream())
         } catch (e: IOException) {
             e.printStackTrace()
             emit(Resource.Error("Couldn't load data"))
+            null
         } catch (e: HttpException) {
             e.printStackTrace()
             emit(Resource.Error("Couldn't load data"))
+            null
+        }
+
+        remoteListings?.let { listings ->
+            dao.clearCompanyListings()
+            dao.insertCompanyListings(listings.map { it.toCompanyListingEntity() })
+            emit(Resource.Success(
+                data = dao.searchCompanyListings("")
+                    .map { it.toCompanyListing() })
+            )
+            emit(Resource.Loading(false))
         }
     }
 }
