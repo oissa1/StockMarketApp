@@ -29,7 +29,13 @@ class IntradayInfoParser @Inject constructor() : CSVParser<IntradayInfo> {
                     ).toIntraDayInfo()
                 }
                 .filter {
-                    it.date.dayOfMonth == LocalDateTime.now().minusDays(1).dayOfMonth
+                    var yesterday = LocalDateTime.now().minusDays(1)
+                    var dayOfWeek = yesterday.dayOfWeek
+                    while (dayOfWeek.value == 6 || dayOfWeek.value == 7) {
+                        yesterday = yesterday.minusDays(1)
+                        dayOfWeek = yesterday.dayOfWeek
+                    }
+                    it.date.dayOfMonth == yesterday.dayOfMonth
                 }
                 .sortedBy {
                     it.date.hour
