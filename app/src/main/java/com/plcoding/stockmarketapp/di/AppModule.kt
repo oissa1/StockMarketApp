@@ -18,7 +18,7 @@ object AppModule {
 
     @Provides
     @Singleton
-    fun providesStockApi() =
+    fun providesStockApi(): StockApi =
         Retrofit.Builder()
             .baseUrl(StockApi.BASE_URL)
             .addConverterFactory(MoshiConverterFactory.create())

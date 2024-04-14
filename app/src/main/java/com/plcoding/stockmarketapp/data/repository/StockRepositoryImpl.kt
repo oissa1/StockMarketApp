@@ -3,6 +3,7 @@ package com.plcoding.stockmarketapp.data.repository
 import com.plcoding.stockmarketapp.data.csv.CSVParser
 import com.plcoding.stockmarketapp.data.local.StockDatabase
 import com.plcoding.stockmarketapp.data.mapper.toCompanyInfo
+import com.plcoding.stockmarketapp.data.mapper.toCompanyInfoEntity
 import com.plcoding.stockmarketapp.data.mapper.toCompanyListing
 import com.plcoding.stockmarketapp.data.mapper.toCompanyListingEntity
 import com.plcoding.stockmarketapp.data.remote.StockApi
@@ -58,12 +59,47 @@ class StockRepositoryImpl @Inject constructor(
         remoteListings?.let { listings ->
             dao.clearCompanyListings()
             dao.insertCompanyListings(listings.map { it.toCompanyListingEntity() })
-            emit(Resource.Success(
-                data = dao.searchCompanyListings("")
-                    .map { it.toCompanyListing() })
+            emit(
+                Resource.Success(
+                    data = dao.searchCompanyListings("")
+                        .map { it.toCompanyListing() })
             )
             emit(Resource.Loading(false))
         }
+    }
+
+    override suspend fun getCompanyInfo(symbol: String, fetchFromRemote: Boolean): Flow<Resource<CompanyInfo>> = flow {
+        emit(Resource.Loading(isLoading = true))
+        val localInfo = dao.getCompanyInfo(symbol)
+        if (localInfo != null) {
+            emit(Resource.Success(data = localInfo.toCompanyInfo()))
+        }
+
+        val shouldJustLoadFromCache = localInfo != null && !fetchFromRemote
+        if (shouldJustLoadFromCache) {
+            emit(Resource.Loading(false))
+            println("OMAARR Just loaded from cache")
+            return@flow
+        }
+        val remoteInfo = try {
+            val response = api.getCompanyInfo(symbol)
+            response.toCompanyInfo()
+        } catch (e: IOException) {
+            e.printStackTrace()
+            emit(Resource.Error("Couldn't load company info"))
+            null
+        } catch (e: HttpException) {
+            e.printStackTrace()
+            emit(Resource.Error("Couldn't load company info"))
+            null
+        }
+        remoteInfo?.let {
+            dao.insertCompanyInfo(it.toCompanyInfoEntity())
+            emit(Resource.Success(data = it))
+            emit(Resource.Loading(false))
+            println("OMAARR Just loaded from network")
+        }
+
     }
 
     override suspend fun getIntradayInfo(symbol: String): Resource<List<IntradayInfo>> {
@@ -79,16 +115,4 @@ class StockRepositoryImpl @Inject constructor(
             Resource.Error("Couldn't load intraday info")
         }
     }
-
-    override suspend fun getCompanyInfo(symbol: String): Resource<CompanyInfo> {
-        return try {
-            val result = api.getCompanyInfo(symbol)
-            Resource.Success(data = result.toCompanyInfo())
-        } catch (e: IOException) {
-            e.printStackTrace()
-            Resource.Error("Couldn't load company info")
-        } catch (e: HttpException) {
-            e.printStackTrace()
-            Resource.Error("Couldn't load company info")
-        }    }
 }

@@ -25,28 +25,8 @@ class CompanyInfoViewModel @Inject constructor(
         viewModelScope.launch {
             val symbol = savedStateHandle.get<String>("symbol") ?: return@launch
             state = state.copy(isLoading = true)
-            val companyInfoResult = async { repository.getCompanyInfo(symbol) }
+            getCompanyInfo(symbol)
             val intradayInfoResult = async { repository.getIntradayInfo(symbol) }
-
-            when (val result = companyInfoResult.await()) {
-                is Resource.Success -> {
-                    state = state.copy(
-                        company = result.data,
-                        isLoading = false,
-                        error = null
-                    )
-                }
-
-                is Resource.Error -> {
-                    state = state.copy(
-                        isLoading = false,
-                        error = result.message ?: "An unexpected error occurred",
-                        company = null
-                    )
-                }
-
-                else -> Unit
-            }
 
             when (val result = intradayInfoResult.await()) {
                 is Resource.Success -> {
@@ -66,6 +46,34 @@ class CompanyInfoViewModel @Inject constructor(
                 }
 
                 else -> Unit
+            }
+        }
+    }
+
+    private suspend fun getCompanyInfo(symbol: String) {
+        viewModelScope.launch {
+            repository.getCompanyInfo(symbol, false).collect { result ->
+                when (result) {
+                    is Resource.Success -> {
+                        state = state.copy(
+                            company = result.data,
+                            isLoading = false,
+                            error = null
+                        )
+                    }
+
+                    is Resource.Error -> {
+                        state = state.copy(
+                            isLoading = false,
+                            error = result.message ?: "An unexpected error occurred",
+                            company = null
+                        )
+                    }
+
+                    is Resource.Loading -> {
+                        state = state.copy(isLoading = result.isLoading)
+                    }
+                }
             }
         }
     }

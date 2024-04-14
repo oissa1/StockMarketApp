@@ -14,5 +14,5 @@ interface StockRepository {
     ): Flow<Resource<List<CompanyListing>>>
 
     suspend fun getIntradayInfo(symbol: String): Resource<List<IntradayInfo>>
-    suspend fun getCompanyInfo(symbol: String): Resource<CompanyInfo>
+    suspend fun getCompanyInfo(symbol: String, fetchFromRemote: Boolean): Flow<Resource<CompanyInfo>>
 }

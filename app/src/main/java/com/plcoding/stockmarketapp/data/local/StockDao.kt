@@ -22,4 +22,10 @@ interface StockDao {
         """
     )
     suspend fun searchCompanyListings(query: String): List<CompanyListingEntity>
+
+    @Insert(onConflict = OnConflictStrategy.REPLACE)
+    suspend fun insertCompanyInfo(companyInfo: CompanyInfoEntity)
+
+    @Query("SELECT * FROM companyinfoentity WHERE symbol == :symbol")
+    suspend fun getCompanyInfo(symbol: String): CompanyInfoEntity?
 }
